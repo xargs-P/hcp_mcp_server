@@ -1,206 +1,337 @@
-# hcp_mcp_server/main.py
-# Main FastAPI application for the HCP Model Context Protocol Server.
-
+# main.py
+import asyncio
 import logging
-import httpx
-from fastapi import FastAPI, HTTPException, Depends, Request
-from contextlib import asynccontextmanager
-from typing import Optional
+import os
+from typing import List, Type, Optional, Dict, Any
 
-from . import hcp_auth
-from .hcp_api_clients import iam_client, resource_manager_client, vault_secrets_client
-# from .models import MCPResponse # If using standardized MCP response models
+# Imports from the official MCP SDK
+from mcp.server import Server, Session
+from mcp.tools import Tool # Base class for tools
+from mcp.common import (
+    Resource,
+    Prompt, # Note: Prompt is in common, PromptRole might be in mcp.prompts
+    ToolCall,
+    ToolResult,
+    ToolInfo,
+    ToolParameter, # For constructing ToolInfo if needed
+    Context,
+    UpdateRequest,
+    UpdateType,
+    Error,
+    ErrorCode,
+)
+from mcp.prompts import PromptRole # PromptRole is in mcp.prompts
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
 
-# --- Global HTTP Client ---
-# Using a global client is often more efficient for multiple requests.
-# It should be managed with lifespan events in FastAPI.
-shared_http_client: Optional[httpx.AsyncClient] = None
+# Import clients (these remain unchanged)
+from hcp_client import HcpClient
+from iam_client import IamClient, IAM_API_VERSION
+from resource_manager_client import ResourceManagerClient, RESOURCE_MANAGER_API_VERSION
+from vault_secrets_client import VaultSecretsClient, VAULT_SECRETS_API_VERSION
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Initialize the HTTP client
-    global shared_http_client
-    shared_http_client = httpx.AsyncClient(timeout=30.0) # Set a reasonable timeout
-    logger.info("HTTPX AsyncClient started.")
-    yield
-    # Shutdown: Close the HTTP client
-    if shared_http_client:
-        await shared_http_client.aclose()
-        logger.info("HTTPX AsyncClient closed.")
-
-app = FastAPI(
-    title="HCP Model Context Protocol Server",
-    description="Provides context from HashiCorp Cloud Platform APIs via MCP.",
-    version="0.1.0",
-    lifespan=lifespan # Manage lifespan of shared_http_client
+# Import tools (their base class will change)
+from tools.resource_manager_tools import (
+    ListOrganizationsTool,
+    GetOrganizationTool,
+    ListProjectsTool,
+    GetProjectTool,
+    GetOrganizationIamPolicyTool,
+    SetOrganizationIamPolicyTool,
+    GetProjectIamPolicyTool,
+    SetProjectIamPolicyTool,
+)
+from tools.iam_tools import (
+    ListServicePrincipalsOrgTool,
+    CreateServicePrincipalOrgTool,
+    GetServicePrincipalOrgTool,
+    DeleteServicePrincipalOrgTool,
+    ListServicePrincipalsProjectTool,
+    CreateServicePrincipalProjectTool,
+    GetServicePrincipalProjectTool,
+    DeleteServicePrincipalProjectTool,
+    CreateServicePrincipalKeyOrgTool,
+    CreateServicePrincipalKeyProjectTool,
+    ListGroupsTool,
+    CreateGroupTool,
+    GetGroupTool,
+)
+from tools.vault_secrets_tools import (
+    ListVaultAppsTool,
+    CreateVaultAppTool,
+    GetVaultAppTool,
+    DeleteVaultAppTool,
+    CreateVaultKvSecretTool,
+    OpenVaultKvSecretTool,
+    DeleteVaultKvSecretTool,
+    ListVaultAppSecretsTool,
 )
 
-# --- Dependency for HCP Access Token ---
-async def get_valid_hcp_token() -> str:
-    """Dependency to get a valid HCP access token."""
-    token = await hcp_auth.get_hcp_access_token()
-    if not token:
-        logger.error("Failed to obtain HCP access token for request.")
-        raise HTTPException(status_code=503, detail="Could not authenticate with HCP. Token unavailable.")
-    return token
+# Import resources (their base class will change)
+from resources.hcp_resources import (
+    HcpOrganizationResource,
+    HcpProjectResource,
+    HcpServicePrincipalResource,
+    HcpGroupResource,
+    HcpVaultAppResource,
+    HcpVaultKvSecretResource,
+    HcpIamPolicyResource,
+)
 
-# --- Helper for API calls ---
-async def execute_api_call(api_function, *args, **kwargs):
-    """Helper to execute an API client function and handle common exceptions."""
-    if not shared_http_client: # Should not happen with lifespan management
-        raise HTTPException(status_code=500, detail="HTTP client not initialized.")
-    try:
-        # Pass the shared_http_client as the first argument
-        return await api_function(shared_http_client, *args, **kwargs)
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HCP API call failed with status {e.response.status_code}: {e.response.text}")
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"HCP API Error: {e.response.text}"
-        )
-    except httpx.RequestError as e:
-        logger.error(f"HCP API request failed: {e}")
-        raise HTTPException(status_code=504, detail=f"HCP API Request Error: {e}") # 504 Gateway Timeout
-    except Exception as e:
-        logger.exception("An unexpected error occurred during API call execution.") # Log full stack trace
-        raise HTTPException(status_code=500, detail=f"An internal server error occurred: {str(e)}")
+# Import prompts (their base class will change)
+from prompts.hcp_prompts import (
+    HcpInitialPrompt,
+    HcpToolSelectionPrompt,
+    HcpClarifyOrgIdPrompt,
+    HcpClarifyProjectIdPrompt,
+    HcpClarifyAppNamePrompt,
+    HcpClarifySecretNamePrompt,
+    HcpHandleErrorPrompt,
+    HcpSummarizeActionResultPrompt,
+    HcpAskForMissingInfoPrompt,
+    HcpConfirmActionPrompt,
+)
 
+load_dotenv()
 
-# --- MCP Endpoint Definitions ---
-# The Model Context Protocol typically uses GET requests where the URI path
-# identifies the resource for which context is being requested.
-# The response is a JSON object.
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-@app.get("/")
-async def read_root():
-    return {"message": "HCP Model Context Protocol Server is running. "
-                     "Access context via specific GET endpoints like /mcp/hcp/organizations"}
+# --- Constants ---
+HCP_API_BASE_URL = "https://api.cloud.hashicorp.com"
+HCP_AUTH_URL = "https://auth.idp.hashicorp.com/oauth/token"
 
-# --- Resource Manager MCP Endpoints ---
-@app.get("/mcp/hcp/organizations")
-async def mcp_list_organizations(token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get a list of HCP organizations."""
-    logger.info("MCP request: /mcp/hcp/organizations")
-    return await execute_api_call(resource_manager_client.list_organizations, token)
-
-@app.get("/mcp/hcp/organizations/{organization_id}")
-async def mcp_get_organization_details(organization_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get details for a specific HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}")
-    return await execute_api_call(resource_manager_client.get_organization, token, organization_id)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/projects")
-async def mcp_list_projects(organization_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get a list of projects within an HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects")
-    return await execute_api_call(resource_manager_client.list_projects, token, organization_id)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/projects/{project_id}")
-async def mcp_get_project_details(organization_id: str, project_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get details for a specific HCP project."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects/{project_id}")
-    return await execute_api_call(resource_manager_client.get_project, token, organization_id, project_id)
-
-
-# --- IAM MCP Endpoints ---
-@app.get("/mcp/hcp/organizations/{organization_id}/iam/users")
-async def mcp_list_iam_users(organization_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get a list of IAM users in an HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/iam/users")
-    return await execute_api_call(iam_client.list_organization_users, token, organization_id)
-
-# Actually calls resource manager. Not sure why it made a function within IAM area
-@app.get("/mcp/hcp/organizations/{organization_id}/iam/roles")
-async def mcp_list_iam_roles(organization_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get a list of IAM roles in an HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/iam/roles")
-    return await execute_api_call(iam_client.list_organization_roles, token, organization_id)
-
-# Actually calls resource manager. Not sure why it made a function within IAM area
-# Not working yet. 
-@app.get("/mcp/hcp/organizations/{organization_id}/iam/roles/{role_id}")
-async def mcp_get_iam_role_details(organization_id: str, role_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get details for a specific IAM role in an HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/iam/roles/{role_id}")
-    return await execute_api_call(iam_client.get_organization_role, token, organization_id, role_id)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/iam/service-principals")
-async def mcp_list_service_principals(organization_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get a list of service principals in an HCP organization."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/iam/service-principals")
-    return await execute_api_call(iam_client.list_service_principals, token, organization_id)
-
-# --- HCP Vault Secrets MCP Endpoints ---
-@app.get("/mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps")
-async def mcp_list_vault_apps(organization_id: str, project_id: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: List secret applications in an HCP Vault project."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps")
-    return await execute_api_call(vault_secrets_client.list_apps, token, organization_id, project_id)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}")
-async def mcp_get_vault_app_details(organization_id: str, project_id: str, app_name: str, token: str = Depends(get_valid_hcp_token)):
-    """MCP: Get details for a specific secret application in HCP Vault."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}")
-    return await execute_api_call(vault_secrets_client.get_app, token, organization_id, project_id, app_name)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}/secrets")
-async def mcp_list_vault_secrets_metadata(
-    organization_id: str, project_id: str, app_name: str, token: str = Depends(get_valid_hcp_token)
-):
-    """MCP: List secrets (metadata) in an HCP Vault application."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}/secrets")
-    return await execute_api_call(vault_secrets_client.list_secrets, token, organization_id, project_id, app_name)
-
-@app.get("/mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}/secrets/{secret_name}")
-async def mcp_get_vault_secret_value(
-    organization_id: str, project_id: str, app_name: str, secret_name: str, token: str = Depends(get_valid_hcp_token)
-):
-    """MCP: Get the value of a specific secret from HCP Vault."""
-    logger.info(f"MCP request: /mcp/hcp/organizations/{organization_id}/projects/{project_id}/vault/apps/{app_name}/secrets/{secret_name}")
-    return await execute_api_call(
-        vault_secrets_client.get_secret_value, token, organization_id, project_id, app_name, secret_name
+def create_tool_info_from_tool_instance(tool: Tool) -> ToolInfo:
+    """
+    Helper function to create ToolInfo from a Tool instance.
+    The official SDK's Tool is a Protocol, so we access attributes.
+    """
+    # Accessing attributes like tool.name, tool.description, tool.parameters
+    # which are expected to be defined by classes implementing the Tool protocol.
+    return ToolInfo(
+        name=tool.name,
+        description=tool.description,
+        parameters=tool.parameters # Assuming tool.parameters is List[ToolParameter]
     )
 
-# To run this application:
-# 1. Save the files in the structure:
-#    hcp_mcp_server/
-#    ├── main.py
-#    ├── hcp_auth.py
-#    ├── hcp_api_clients/
-#    │   ├── __init__.py
-#    │   ├── base_client.py
-#    │   ├── iam_client.py
-#    │   ├── resource_manager_client.py
-#    │   └── vault_secrets_client.py
-#    ├── models/
-#    │   └── __init__.py
-#    ├── .env (copied from .env_example and filled)
-#    └── requirements.txt
-#
-# 2. Install requirements: pip install -r requirements.txt
-# 3. Set HCP_CLIENT_ID and HCP_CLIENT_SECRET in a .env file in the hcp_mcp_server directory.
-# 4. Run with Uvicorn from the directory containing `hcp_mcp_server`:
-#    uvicorn hcp_mcp_server.main:app --reload --port 8000
-#
-# Example MCP URIs to test (replace placeholders):
-# http://localhost:8000/mcp/hcp/organizations
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}/projects
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}/projects/{your_project_id}
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}/iam/users
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}/projects/{your_project_id}/vault/apps
-# http://localhost:8000/mcp/hcp/organizations/{your_org_id}/projects/{your_project_id}/vault/apps/{your_app_name}/secrets/{your_secret_name}
+class HcpMcpServer(Server): # Inherits from mcp.server.Server
+    """
+    MCP Server for interacting with HashiCorp Cloud Platform.
+    Adapted to use the official 'mcp' Python SDK.
+    """
+    def __init__(self, hcp_client_id: str, hcp_client_secret: str):
+        # super().__init__() # mcp.server.Server does not have an __init__ in the SDK
+        self.hcp_client = HcpClient(HCP_API_BASE_URL, HCP_AUTH_URL, hcp_client_id, hcp_client_secret)
+        self.iam_client = IamClient(self.hcp_client)
+        self.resource_manager_client = ResourceManagerClient(self.hcp_client)
+        self.vault_secrets_client = VaultSecretsClient(self.hcp_client)
+
+        self._tools: Dict[str, Tool] = self._register_tools()
+        # self._resources: List[Resource] = [] # Resources are part of the context
+        self._prompts: List[Type[Prompt]] = self._register_prompts()
+        
+        # Initialize current_context
+        # The official SDK's Context takes resources and tool_infos
+        self.current_context: Context = Context(resources=[], tool_infos=self.get_tool_infos())
+
+    def _register_tools(self) -> Dict[str, Tool]:
+        """Registers all available HCP tools."""
+        tools_list: List[Tool] = [ # Explicitly type hint as List[Tool]
+            # Resource Manager Tools
+            ListOrganizationsTool(self.resource_manager_client),
+            GetOrganizationTool(self.resource_manager_client),
+            ListProjectsTool(self.resource_manager_client),
+            GetProjectTool(self.resource_manager_client),
+            GetOrganizationIamPolicyTool(self.resource_manager_client),
+            SetOrganizationIamPolicyTool(self.resource_manager_client),
+            GetProjectIamPolicyTool(self.resource_manager_client),
+            SetProjectIamPolicyTool(self.resource_manager_client),
+
+            # IAM Tools
+            ListServicePrincipalsOrgTool(self.iam_client),
+            CreateServicePrincipalOrgTool(self.iam_client),
+            GetServicePrincipalOrgTool(self.iam_client),
+            DeleteServicePrincipalOrgTool(self.iam_client),
+            ListServicePrincipalsProjectTool(self.iam_client),
+            CreateServicePrincipalProjectTool(self.iam_client),
+            GetServicePrincipalProjectTool(self.iam_client),
+            DeleteServicePrincipalProjectTool(self.iam_client),
+            CreateServicePrincipalKeyOrgTool(self.iam_client),
+            CreateServicePrincipalKeyProjectTool(self.iam_client),
+            ListGroupsTool(self.iam_client),
+            CreateGroupTool(self.iam_client),
+            GetGroupTool(self.iam_client),
+            
+            # Vault Secrets Tools
+            ListVaultAppsTool(self.vault_secrets_client),
+            CreateVaultAppTool(self.vault_secrets_client),
+            GetVaultAppTool(self.vault_secrets_client),
+            DeleteVaultAppTool(self.vault_secrets_client),
+            CreateVaultKvSecretTool(self.vault_secrets_client),
+            OpenVaultKvSecretTool(self.vault_secrets_client),
+            DeleteVaultKvSecretTool(self.vault_secrets_client),
+            ListVaultAppSecretsTool(self.vault_secrets_client),
+        ]
+        # The Tool protocol has 'name' as an attribute.
+        return {tool.name: tool for tool in tools_list}
+
+    def _register_prompts(self) -> List[Type[Prompt]]:
+        """Registers all available HCP prompts."""
+        return [
+            HcpInitialPrompt,
+            HcpToolSelectionPrompt,
+            HcpClarifyOrgIdPrompt,
+            HcpClarifyProjectIdPrompt,
+            HcpClarifyAppNamePrompt,
+            HcpClarifySecretNamePrompt,
+            HcpHandleErrorPrompt,
+            HcpSummarizeActionResultPrompt,
+            HcpAskForMissingInfoPrompt,
+            HcpConfirmActionPrompt,
+        ]
+
+    async def get_context(self, session: Optional[Session] = None) -> Context:
+        """
+        Provides the initial context to the LLM, including available tools and resources.
+        """
+        logger.info("Getting initial context for LLM.")
+        # Update tool_infos in case they are dynamic (though not in this example)
+        self.current_context.tool_infos = self.get_tool_infos()
+        return self.current_context
+
+    async def execute_tool_call(self, call: ToolCall, session: Optional[Session] = None) -> ToolResult:
+        """
+        Executes a tool based on the LLM's request.
+        Signature matches mcp.server.Server.
+        """
+        logger.info(f"Executing tool: {call.name} with params: {call.params}")
+        tool = self._tools.get(call.name)
+        if not tool:
+            logger.error(f"Tool not found: {call.name}")
+            return ToolResult(
+                tool_call_id=call.tool_call_id, # SDK uses tool_call_id
+                content_text="Tool not found.", # SDK uses content_text
+                error=Error(code=ErrorCode.TOOL_NOT_FOUND, message=f"Tool '{call.name}' not found.")
+            )
+
+        try:
+            if not await self.hcp_client.ensure_authenticated():
+                 return ToolResult(
+                    tool_call_id=call.tool_call_id,
+                    content_text="Failed to authenticate with HCP.",
+                    error=Error(code=ErrorCode.AUTHENTICATION_ERROR, message="HCP authentication failed.")
+                )
+
+            # Tool's __call__ method is expected by the SDK's Tool protocol
+            # It should return a tuple: (content_string, list_of_resources)
+            result_content_str, produced_resources_list = await tool(**call.params) # Unpack params
+            
+            if produced_resources_list:
+                for res in produced_resources_list:
+                    # Ensure res is an instance of mcp.common.Resource
+                    if not isinstance(res, Resource):
+                        logger.error(f"Tool {call.name} produced a non-Resource object: {type(res)}")
+                        # Handle error or skip this non-Resource object
+                        continue
+                    
+                    if not any(existing_res.id == res.id for existing_res in self.current_context.resources):
+                         self.current_context.resources.append(res)
+                logger.info(f"Context updated with {len(produced_resources_list)} new resource(s).")
+
+            return ToolResult(
+                tool_call_id=call.tool_call_id, 
+                content_text=result_content_str, 
+                resources=produced_resources_list
+            )
+        except Exception as e:
+            logger.exception(f"Error executing tool {call.name}: {e}")
+            return ToolResult(
+                tool_call_id=call.tool_call_id,
+                content_text=f"An error occurred: {str(e)}",
+                error=Error(code=ErrorCode.TOOL_EXECUTION_ERROR, message=str(e))
+            )
+
+    def get_tool_infos(self) -> List[ToolInfo]:
+        """Returns information about all registered tools."""
+        return [create_tool_info_from_tool_instance(tool) for tool in self._tools.values()]
+
+    async def process_update(self, update: UpdateRequest, session: Optional[Session] = None) -> None:
+        """
+        Handles updates from the client.
+        Signature matches mcp.server.Server.
+        """
+        logger.info(f"Received update: {update.update_type} for resource ID: {update.resource.id if update.resource else 'N/A'}")
+        if update.update_type == UpdateType.ADD or update.update_type == UpdateType.MODIFY:
+            if update.resource:
+                # Ensure resource is mcp.common.Resource
+                if not isinstance(update.resource, Resource):
+                    logger.error(f"Received update with non-Resource object: {type(update.resource)}")
+                    return
+                self.current_context.resources = [res for res in self.current_context.resources if res.id != update.resource.id]
+                self.current_context.resources.append(update.resource)
+                logger.info(f"Resource {update.resource.id} added/modified in context.")
+        elif update.update_type == UpdateType.REMOVE:
+            if update.resource_id: # SDK uses resource_id for REMOVE
+                self.current_context.resources = [res for res in self.current_context.resources if res.id != update.resource_id]
+                logger.info(f"Resource {update.resource_id} removed from context.")
+
+async def main():
+    """Main function to run the server."""
+    hcp_client_id = os.getenv("HCP_CLIENT_ID")
+    hcp_client_secret = os.getenv("HCP_CLIENT_SECRET")
+
+    if not hcp_client_id or not hcp_client_secret:
+        logger.error("HCP_CLIENT_ID and HCP_CLIENT_SECRET environment variables must be set.")
+        return
+
+    server = HcpMcpServer(hcp_client_id, hcp_client_secret)
+    
+    logger.info("HCP MCP Server initialized and ready (adapted for official 'mcp' Python SDK).")
+    logger.info(f"Registered tools: {[tool_name for tool_name in server._tools.keys()]}")
+    logger.info(f"Registered prompts: {[prompt_type.__name__ for prompt_type in server._prompts]}")
+    logger.info(f"IAM API Version: {IAM_API_VERSION}")
+    logger.info(f"Resource Manager API Version: {RESOURCE_MANAGER_API_VERSION}")
+    logger.info(f"Vault Secrets API Version: {VAULT_SECRETS_API_VERSION}")
+
+    # Example: Simulate getting context
+    # In a real scenario, the MCP framework would call this.
+    # session_example = Session(session_id="test-session-123") # If Session object is needed
+    initial_context = await server.get_context() # Pass session_example if required by your setup
+    logger.info(f"Initial context has {len(initial_context.tool_infos)} tools and {len(initial_context.resources)} resources.")
+
+    # Example: Simulate a tool execution
+    # test_tool_call = ToolCall(
+    #     tool_call_id="test-call-org-list",
+    #     name=ListOrganizationsTool.name, 
+    #     params={}
+    # )
+    # try:
+    #     tool_result = await server.execute_tool_call(test_tool_call) # Pass session_example if required
+    #     logger.info(f"Test tool execution result content: {tool_result.content_text}")
+    #     if tool_result.resources:
+    #         logger.info(f"Produced resources: {[res.id for res in tool_result.resources]}")
+    #     if tool_result.error:
+    #         logger.error(f"Test tool execution error: {tool_result.error.message}")
+    # except Exception as e:
+    #     logger.error(f"Error during test tool execution: {e}")
+
 
 if __name__ == "__main__":
-    # This part is for running with `python -m hcp_mcp_server.main`
-    # However, uvicorn is the recommended way to run FastAPI apps.
-    import uvicorn
-    # Ensure .env is in the same directory as this script if running this way,
-    # or that the hcp_mcp_server package is in PYTHONPATH.
-    # Best to run with: uvicorn hcp_mcp_server.main:app --reload
-    logger.warning("Running directly with __main__. Recommended: uvicorn hcp_mcp_server.main:app --reload")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # To run this server as a service, you would typically use an ASGI server
+    # like Uvicorn, and the `mcp` SDK would provide a way to integrate with it,
+    # or you'd wrap this `HcpMcpServer` in a FastAPI/Starlette app that uses the SDK.
+    # For example (conceptual, actual integration depends on the `mcp` SDK's design for serving):
+    # import uvicorn
+    # from mcp.contrib.fastapi import McpFastAPI # Hypothetical integration
+    #
+    # hcp_client_id = os.getenv("HCP_CLIENT_ID")
+    # hcp_client_secret = os.getenv("HCP_CLIENT_SECRET")
+    # if hcp_client_id and hcp_client_secret:
+    #     actual_server_instance = HcpMcpServer(hcp_client_id, hcp_client_secret)
+    #     app = McpFastAPI(actual_server_instance) # Hypothetical
+    #     uvicorn.run(app, host="0.0.0.0", port=8000)
+    # else:
+    #     logger.error("Cannot start full server: HCP_CLIENT_ID and HCP_CLIENT_SECRET must be set.")
+    #     asyncio.run(main()) # Run the informational main if full server can't start
+
+    asyncio.run(main()) # For now, just run the informational main
