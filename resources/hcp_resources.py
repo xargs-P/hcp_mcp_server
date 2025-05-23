@@ -3,21 +3,16 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, Any, List
 
 # Imports from the official MCP SDK
-from mcp.common import Resource # Base class for resources
+# Corrected: Resource is re-exported at top-level mcp
+from mcp import Resource 
 
-# Removed convert_to_dict as mcp.common.Resource is a dataclass,
-# and asdict can be used if a dict representation is needed externally.
-# Internally, the SDK should handle Resource objects.
 
 @dataclass
-class HcpOrganizationResource(Resource): # Inherits from mcp.common.Resource
-    # MCP Resource requires 'id' and 'type'
-    # 'data' field will hold all other specific attributes.
-    id: str # HCP Organization ID
-    type: str = field(default="hcp_organization", init=False) # MCP type
+class HcpOrganizationResource(Resource): 
+    id: str 
+    type: str = field(default="hcp_organization", init=False) 
     data: Dict[str, Any] = field(default_factory=dict)
 
-    # Convenience properties to access common fields from data
     @property
     def name(self) -> str: return self.data.get("name", "Unknown Organization")
     @property
@@ -28,24 +23,21 @@ class HcpOrganizationResource(Resource): # Inherits from mcp.common.Resource
     @classmethod
     def from_api_response(cls, api_data: Dict[str, Any]) -> "HcpOrganizationResource":
         org_id = api_data.get("id", "")
-        # Store all relevant API data in the 'data' field
         resource_data = {
             "name": api_data.get("name", "Unknown Organization"),
             "created_at": api_data.get("created_at", ""),
             "state": api_data.get("state", {}).get("state", "UNKNOWN") if isinstance(api_data.get("state"), dict) else api_data.get("state", "UNKNOWN"),
-            "raw_api_response": api_data # Store the full response if needed
+            "raw_api_response": api_data 
         }
         return cls(id=org_id, data=resource_data)
 
-    # to_dict is not strictly needed if the SDK handles Resource objects,
-    # but can be useful for other purposes.
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
 @dataclass
 class HcpProjectResource(Resource):
-    id: str # HCP Project ID
+    id: str 
     type: str = field(default="hcp_project", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
@@ -80,7 +72,7 @@ class HcpProjectResource(Resource):
 
 @dataclass
 class HcpIamPolicyResource(Resource):
-    id: str # Composite ID like "iam_policy_for_organizations_org-id"
+    id: str 
     type: str = field(default="hcp_iam_policy", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
@@ -94,12 +86,11 @@ class HcpIamPolicyResource(Resource):
 
     @classmethod
     def from_api_response(cls, api_data: Dict[str, Any], resource_path: str) -> "HcpIamPolicyResource":
-        # resource_path is like "organizations/org-id" or "projects/project-id"
         mcp_id = f"iam_policy_for_{resource_path.replace('/', '_')}"
         resource_data = {
             "bindings": api_data.get("bindings", []),
             "etag": api_data.get("etag", ""),
-            "resource_path": resource_path, # Store the original path for context
+            "resource_path": resource_path, 
             "raw_api_response": api_data
         }
         return cls(id=mcp_id, data=resource_data)
@@ -109,14 +100,14 @@ class HcpIamPolicyResource(Resource):
 
 @dataclass
 class HcpServicePrincipalResource(Resource):
-    id: str # HCP SP ID
+    id: str 
     type: str = field(default="hcp_service_principal", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def name(self) -> str: return self.data.get("name", "Unknown SP")
     @property
-    def resource_name(self) -> str: return self.data.get("resource_name", "") # HCP's full resource name
+    def resource_name(self) -> str: return self.data.get("resource_name", "") 
     @property
     def organization_id(self) -> Optional[str]: return self.data.get("organization_id")
     @property
@@ -142,7 +133,7 @@ class HcpServicePrincipalResource(Resource):
 
 @dataclass
 class HcpServicePrincipalKeyResource(Resource):
-    id: str # client_id of the key
+    id: str 
     type: str = field(default="hcp_service_principal_key", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
@@ -157,7 +148,7 @@ class HcpServicePrincipalKeyResource(Resource):
     @property
     def state(self) -> str: return self.data.get("state", "UNKNOWN")
     @property
-    def client_secret(self) -> Optional[str]: return self.data.get("client_secret") # Sensitive
+    def client_secret(self) -> Optional[str]: return self.data.get("client_secret") 
 
     @classmethod
     def from_api_response(cls, api_data: Dict[str, Any], sp_id: str, parent_scope: str, secret: Optional[str] = None) -> "HcpServicePrincipalKeyResource":
@@ -168,21 +159,18 @@ class HcpServicePrincipalKeyResource(Resource):
             "parent_scope_id": parent_scope,
             "created_at": api_data.get("created_at", ""),
             "state": api_data.get("state", {}).get("state", "UNKNOWN") if isinstance(api_data.get("state"), dict) else api_data.get("state", "UNKNOWN"),
-            "client_secret": secret, # Store if provided, be mindful of exposure
+            "client_secret": secret, 
             "raw_api_response": api_data
         }
         return cls(id=key_id, data=resource_data)
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        # Potentially redact client_secret if this dict is broadly used
-        # if "client_secret" in d["data"] and d["data"]["client_secret"] is not None:
-        #     d["data"]["client_secret"] = "[REDACTED]"
         return d
 
 @dataclass
 class HcpGroupResource(Resource):
-    id: str # resource_id of the group
+    id: str 
     type: str = field(default="hcp_group", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
@@ -228,7 +216,7 @@ class HcpGroupResource(Resource):
 
 @dataclass
 class HcpVaultAppResource(Resource):
-    id: str # resource_id of the app
+    id: str 
     type: str = field(default="hcp_vault_app", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
@@ -264,12 +252,12 @@ class HcpVaultAppResource(Resource):
 
 @dataclass
 class HcpVaultKvSecretResource(Resource):
-    id: str # Composite ID: app_name + secret_name
+    id: str 
     type: str = field(default="hcp_vault_kv_secret", init=False)
     data: Dict[str, Any] = field(default_factory=dict)
 
     @property
-    def name(self) -> str: return self.data.get("name", "Unknown Secret") # Secret's own name
+    def name(self) -> str: return self.data.get("name", "Unknown Secret") 
     @property
     def app_name(self) -> str: return self.data.get("app_name", "")
     @property
@@ -279,7 +267,7 @@ class HcpVaultKvSecretResource(Resource):
     @property
     def version(self) -> Optional[int]: return self.data.get("version")
     @property
-    def value(self) -> Optional[str]: return self.data.get("value") # Sensitive
+    def value(self) -> Optional[str]: return self.data.get("value") 
     @property
     def created_at(self) -> Optional[str]: return self.data.get("created_at")
 
@@ -325,7 +313,4 @@ class HcpVaultKvSecretResource(Resource):
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        # Potentially redact value if this dict is broadly used
-        # if "value" in d["data"] and d["data"]["value"] is not None:
-        #    d["data"]["value"] = "[REDACTED]"
         return d

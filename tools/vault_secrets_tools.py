@@ -3,8 +3,9 @@ import logging
 from typing import Dict, Any, Tuple, List, Optional
 
 # Imports from the official MCP SDK
+# Corrected: ToolParameter from mcp.tools, Resource from mcp.common
 from mcp.tools import Tool, ToolParameter
-from mcp.common import Resource # For type hinting
+from mcp.common import Resource 
 
 from vault_secrets_client import VaultSecretsClient
 from resources.hcp_resources import HcpVaultAppResource, HcpVaultKvSecretResource

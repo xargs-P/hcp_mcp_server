@@ -2,12 +2,13 @@
 from dataclasses import dataclass
 
 # Imports from the official MCP SDK
-from mcp.common import Prompt # Prompt is in mcp.common
-from mcp.prompts import PromptRole # PromptRole is in mcp.prompts
+# Corrected: Prompt is from mcp (re-exported from mcp.types as per dir() output)
+from mcp import Prompt 
+from mcp.prompts import PromptRole # PromptRole is in mcp.prompts as per README
 
 # --- General Prompts ---
 @dataclass
-class HcpInitialPrompt(Prompt): # Inherits from mcp.common.Prompt
+class HcpInitialPrompt(Prompt): 
     role: PromptRole = PromptRole.SYSTEM 
     content: str = (
         "You are an AI assistant for managing HashiCorp Cloud Platform (HCP) resources. "

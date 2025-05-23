@@ -3,25 +3,21 @@ import logging
 from typing import Dict, Any, Tuple, List, Optional
 
 # Imports from the official MCP SDK
-from mcp.tools import Tool, ToolParameter  # Tool is a Protocol, ToolParameter for defining params
-# ReturnValue is not directly in the SDK's Tool definition,
-# the __call__ method returns Any. The ToolResult is constructed by the server.
-# We'll define parameters using ToolParameter.
-from mcp.common import Resource # For type hinting produced resources
+# Corrected: Common classes like ToolParameter and Resource are re-exported at top-level mcp
+from mcp import Tool, Resource, ToolParameter  
 
 from resource_manager_client import ResourceManagerClient
 from resources.hcp_resources import HcpOrganizationResource, HcpProjectResource, HcpIamPolicyResource
 
 logger = logging.getLogger(__name__)
 
-class ListOrganizationsTool(Tool): # Implements mcp.tools.Tool Protocol
+class ListOrganizationsTool(Tool): 
     name: str = "hcp_list_organizations"
     description: str = "Lists HashiCorp Cloud Platform (HCP) organizations accessible to the caller."
     parameters: List[ToolParameter] = [
         ToolParameter(name="page_size", type="integer", is_required=False, description="Number of organizations to return per page (default 50)."),
         ToolParameter(name="next_page_token", type="string", is_required=False, description="Token for fetching the next page of results."),
     ]
-    # ReturnValue is implicitly defined by the __call__ signature's output for ToolResult construction
 
     def __init__(self, client: ResourceManagerClient):
         self.client = client

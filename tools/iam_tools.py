@@ -3,8 +3,8 @@ import logging
 from typing import Dict, Any, Tuple, List, Optional
 
 # Imports from the official MCP SDK
-from mcp.tools import Tool, ToolParameter
-from mcp.common import Resource # For type hinting
+# Corrected: Common classes like ToolParameter and Resource are re-exported at top-level mcp
+from mcp import Tool, Resource, ToolParameter 
 
 from iam_client import IamClient
 from resources.hcp_resources import HcpServicePrincipalResource, HcpServicePrincipalKeyResource, HcpGroupResource
@@ -87,7 +87,7 @@ class DeleteServicePrincipalOrgTool(Tool):
         ToolParameter(name="principal_id", type="string", is_required=True, description="The ID of the service principal to delete."),
     ]
     def __init__(self, client: IamClient): self.client = client
-    async def __call__(self, **kwargs: Any) -> Tuple[str, None]: # Returns None for resources
+    async def __call__(self, **kwargs: Any) -> Tuple[str, None]: 
         org_id = kwargs.get("organization_id")
         principal_id = kwargs.get("principal_id")
         if not org_id or not principal_id: return "Error: organization_id and principal_id are required.", None
