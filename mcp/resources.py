@@ -1,55 +1,60 @@
-from pydantic import BaseModel
-from typing import List, Dict
+from mcp.models import Resource
 
-class Resource(BaseModel):
-    """
-    A resource that can be exposed by the MCP server.
-    """
-    name: str
-    description: str
-    properties: Dict[str, str]
+def organization_resource():
+    return Resource(
+        name="hcp/organization",
+        description="An HCP organization.",
+        type="object",
+        resource_schema={
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The ID of the organization."},
+                "name": {"type": "string", "description": "The name of the organization."},
+                "created_at": {"type": "string", "description": "The timestamp when the organization was created."},
+            },
+            "required": ["id", "name", "created_at"],
+        },
+    )
 
-class Project(Resource):
-    """
-    An HCP project.
-    """
-    name: str = "Project"
-    description: str = "A HashiCorp Cloud Platform project."
-    properties: Dict[str, str] = {
-        "id": "The project's unique identifier.",
-        "name": "The project's name.",
-        "organization_id": "The ID of the organization the project belongs to.",
-    }
+def project_resource():
+    return Resource(
+        name="hcp/project",
+        description="An HCP project.",
+        type="object",
+        resource_schema={
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The ID of the project."},
+                "name": {"type": "string", "description": "The name of the project."},
+                "organization_id": {"type": "string", "description": "The ID of the organization the project belongs to."},
+                "created_at": {"type": "string", "description": "The timestamp when the project was created."},
+            },
+            "required": ["id", "name", "organization_id", "created_at"],
+        },
+    )
 
-class User(Resource):
-    """
-    An HCP user.
-    """
-    name: str = "User"
-    description: str = "A HashiCorp Cloud Platform user."
-    properties: Dict[str, str] = {
-        "email": "The user's email address.",
-        "name": "The user's name.",
-    }
+def user_resource():
+    return Resource(
+        name="hcp/user",
+        description="An HCP user.",
+        type="object",
+        resource_schema={
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The ID of the user."},
+                "name": {"type": "string", "description": "The name of the user."},
+                "email": {"type": "string", "description": "The email of the user."},
+            },
+            "required": ["id", "name", "email"],
+        },
+    )
 
-class Secret(Resource):
+def get_resources():
     """
-    An HCP Vault secret.
+    Returns a list of all available resources.
     """
-    name: str = "Secret"
-    description: str = "A secret stored in HCP Vault."
-    properties: Dict[str, str] = {
-        "name": "The secret's name.",
-        "value": "The secret's value.",
-    }
-
-class Organization(Resource):
-    """
-    An HCP organization.
-    """
-    name: str = "Organization"
-    description: str = "A HashiCorp Cloud Platform organization."
-    properties: Dict[str, str] = {
-        "id": "The organization's unique identifier.",
-        "name": "The organization's name.",
-    }
+    return [
+        organization_resource().model_dump(),
+        project_resource().model_dump(),
+        user_resource().model_dump(),
+    ]

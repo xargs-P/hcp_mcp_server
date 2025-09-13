@@ -4,16 +4,16 @@ This server implements the Model Context Protocol (MCP) to provide a natural lan
 
 ## Architecture
 
-The server is built using FastAPI and follows a modular structure:
+The server is built to support the Model Context Protocol (MCP) and follows a modular structure:
 
--   **`main.py`**: The main entry point for the FastAPI application. It defines the MCP endpoints (`/mcp` and `/.well-known/mcp.json`), handles incoming requests, and maps them to the appropriate tools.
+-   **`main.py`**: The main entry point for the application. It runs as a stdio-based MCP transport, handles incoming requests, and maps them to the appropriate tools.
 -   **`hcp/`**: This directory contains modules for interacting with the HCP API.
     -   `auth.py`: Handles OAuth2 authentication with HCP to retrieve access tokens.
     -   `iam.py`: Contains functions for interacting with the HCP IAM API (users, roles, etc.).
     -   `resource_manager.py`: Contains functions for interacting with the HCP Resource Manager API (organizations, projects).
     -   `vault.py`: Contains functions for interacting with the HCP Vault Secrets API.
 -   **`mcp/`**: This directory contains modules that define the MCP-specific components.
-    -   `resources.py`: Defines the data models for the resources exposed by the server (e.g., Project, User, Secret).
+    -   `models.py`: Defines the data models for the resources exposed by the server (e.g., Project, User, Secret).
     -   `tools.py`: Defines the tools that the LLM can use to interact with the HCP API.
     -   `prompts.py`: Contains predefined prompts for single and multi-step workflows.
 -   **`utils/`**: This directory contains helper functions.
@@ -58,6 +58,4 @@ The server is built using FastAPI and follows a modular structure:
     ```
 
 4.  **Run the server:**
-    ```bash
-    python main.py
-    ```
+    The server is designed to be run as a stdio-based MCP transport. When the Gemini CLI starts, it will automatically run the server.

@@ -12,6 +12,8 @@ async def get_access_token():
     """
     Retrieves an access token from the HCP authentication server.
     """
+    if not HCP_CLIENT_ID or not HCP_CLIENT_SECRET:
+        raise ValueError("HCP_CLIENT_ID and HCP_CLIENT_SECRET must be set.")
     async with httpx.AsyncClient() as client:
         response = await client.post(
             HCP_AUTH_URL,
