@@ -1,0 +1,20 @@
+# Python Standard Library
+# (No specific packages from the standard library need to be listed here)
+
+# Third-Party Packages
+# Core web framework and server
+fastapi
+uvicorn
+
+# HTTP client for making API requests
+httpx
+
+# Environment variable management
+python-dotenv
+pydantic-settings
+
+# Data validation and settings management
+pydantic
+
+# Typing and annotations
+typing-extensions
