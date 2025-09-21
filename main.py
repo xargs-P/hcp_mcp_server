@@ -132,7 +132,7 @@ async def process_mcp_request(body: dict):
     params = body.get("params")
 
     # Log client calls
-    if method in ["tools/call", "prompts/get", "resources/get"]:
+    if method in ["tools/call", "prompts/get", "resources/read"]:
         logger.info(f"Client call: {json.dumps(body)}")
     else:
         logger.info(f"Received request: {json.dumps(body)}")
@@ -141,15 +141,15 @@ async def process_mcp_request(body: dict):
         return {
             "jsonrpc": "2.0",
             "result": {
-                "protocolVersion": "2025-06-18",
+                "protocolVersion": "2024-11-05",
                 "serverInfo": {
                     "name": "HCP",
                     "version": "0.0.1",
                 },
                 "capabilities": {
-                    "tool_provider": {},
-                    "prompt_provider": {},
-                    "resource_provider": {},
+                    "tools": {"listChanged": True},
+                    "prompts": {"listChanged": True},
+                    "resources": {"listChanged": True},
                 },
             },
             "id": request_id,
@@ -177,7 +177,10 @@ async def process_mcp_request(body: dict):
                 logger.info(f"Tool request data: {result}")
                 return {
                     "jsonrpc": "2.0",
-                    "result": {"structuredContent": result },
+                    "result": {
+                        "content": [{"type": "text", "text": json.dumps(result)}],
+                        "isError": False,
+                    },
                     "id": request_id,
                 }
             except ValueError as e:
@@ -231,7 +234,7 @@ async def process_mcp_request(body: dict):
             "result": {"resources": [r.model_dump() for r in resources.get_resources()]},
             "id": request_id,
         }
-    elif method == "resources/get":
+    elif method == "resources/read":
         resource_uri = params.get("uri")
         parameters = params.get("parameters", {})
         if resource_uri in RESOURCE_MAP:

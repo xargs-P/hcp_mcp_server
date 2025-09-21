@@ -6,10 +6,8 @@ class Tool(BaseModel):
     A tool that can be exposed by the MCP server.
     """
     name: str
-    title: Optional[str] = None
     description: Optional[str] = None
     inputSchema: Optional[Dict[str, Any]] = None
-    outputSchema: Dict[str, Any] = Field(default={"type": "object"})
 
 class Prompt(BaseModel):
     """
@@ -26,7 +24,6 @@ class Resource(BaseModel):
     """
     uri: str
     name: str
-    title: Optional[str] = None
     description: Optional[str] = None
     mimeType: Optional[str] = None
     size: Optional[int] = None
