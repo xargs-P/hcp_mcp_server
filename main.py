@@ -13,18 +13,17 @@ from hcp.resource_manager import (
     update_organization,
 )
 from hcp.iam import (
-    list_users,
-    get_user,
-    delete_user,
-    create_user,
-    update_user,
+    search_principals,
+    get_principals,
+    delete_service_principal,
+    create_service_principal,
+    update_service_principal,
 )
 from hcp.vault import (
     list_secrets,
     get_secret,
     delete_secret,
     create_secret,
-    update_secret,
 )
 from utils.finders import (
     find_project_by_name,
@@ -49,16 +48,15 @@ def get_tools():
         tools.get_organization_tool().model_dump(),
         tools.list_organizations_tool().model_dump(),
         tools.update_organization_tool().model_dump(),
-        tools.list_users_tool().model_dump(),
-        tools.get_user_tool().model_dump(),
-        tools.delete_user_tool().model_dump(),
-        tools.create_user_tool().model_dump(),
-        tools.update_user_tool().model_dump(),
+        tools.search_principals_tool().model_dump(),
+        tools.get_principals_tool().model_dump(),
+        tools.delete_service_principal_tool().model_dump(),
+        tools.create_service_principal_tool().model_dump(),
+        tools.update_service_principal_tool().model_dump(),
         tools.list_secrets_tool().model_dump(),
         tools.get_secret_tool().model_dump(),
         tools.delete_secret_tool().model_dump(),
         tools.create_secret_tool().model_dump(),
-        tools.update_secret_tool().model_dump(),
         tools.find_project_by_name_tool().model_dump(),
         tools.find_user_by_email_tool().model_dump(),
         tools.find_organization_by_name_tool().model_dump(),
@@ -77,19 +75,12 @@ def get_prompts():
         "get_organization": prompts.GET_ORGANIZATION_PROMPT,
         "list_organizations": prompts.LIST_ORGANIZATIONS_PROMPT,
         "update_organization": prompts.UPDATE_ORGANIZATION_PROMPT,
-        "list_users": prompts.LIST_USERS_PROMPT,
-        "get_user": prompts.GET_USER_PROMPT,
-        "delete_user": prompts.DELETE_USER_PROMPT,
-        "create_user": prompts.CREATE_USER_PROMPT,
-        "update_user": prompts.UPDATE_USER_PROMPT,
         "list_secrets": prompts.LIST_SECRETS_PROMPT,
         "get_secret": prompts.GET_SECRET_PROMPT,
         "delete_secret": prompts.DELETE_SECRET_PROMPT,
         "create_secret": prompts.CREATE_SECRET_PROMPT,
-        "update_secret": prompts.UPDATE_SECRET_PROMPT,
         "find_project_and_list_secrets": prompts.FIND_PROJECT_AND_LIST_SECRETS_PROMPT,
         "find_project_and_delete_project": prompts.FIND_PROJECT_AND_DELETE_PROJECT_PROMPT,
-        "find_user_and_delete_user": prompts.FIND_USER_AND_DELETE_USER_PROMPT,
     }
 
 
@@ -102,25 +93,23 @@ TOOL_MAP = {
     "get_organization": get_organization,
     "list_organizations": list_organizations,
     "update_organization": update_organization,
-    "list_users": list_users,
-    "get_user": get_user,
-    "delete_user": delete_user,
-    "create_user": create_user,
-    "update_user": update_user,
+    "search_principals": search_principals,
+    "get_principals": get_principals,
+    "delete_service_principal": delete_service_principal,
+    "create_service_principal": create_service_principal,
+    "update_service_principal": update_service_principal,
     "list_secrets": list_secrets,
     "get_secret": get_secret,
     "delete_secret": delete_secret,
     "create_secret": create_secret,
-    "update_secret": update_secret,
     "find_project_by_name": find_project_by_name,
     "find_user_by_email": find_user_by_email,
     "find_organization_by_name": find_organization_by_name,
 }
 
 RESOURCE_MAP = {
-    "hcp://cloud.hashicorp.com/organizations/{organization_id}": get_organization,
-    "hcp://cloud.hashicorp.com/organizations/{organization_id}/projects/{project_id}": get_project,
-    "hcp://cloud.hashicorp.com/users/{user_id}": get_user,
+    "hcp://resource-manager.hashicorp.cloud/organization/{organization_id}": get_organization,
+    "hcp://resource-manager.hashicorp.cloud/project/{project_id}": get_project,
 }
 
 async def process_mcp_request(body: dict):

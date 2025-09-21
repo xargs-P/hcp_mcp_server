@@ -11,18 +11,17 @@ from hcp.resource_manager import (
     update_organization,
 )
 from hcp.iam import (
-    list_users,
-    get_user,
-    delete_user,
-    create_user,
-    update_user,
+    search_principals,
+    get_principals,
+    delete_service_principal,
+    create_service_principal,
+    update_service_principal,
 )
 from hcp.vault import (
     list_secrets,
     get_secret,
     delete_secret,
     create_secret,
-    update_secret,
 )
 from utils.finders import (
     find_project_by_name,
@@ -50,10 +49,9 @@ def get_project_tool():
         inputSchema={
             "type": "object",
             "properties": {
-                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
             },
-            "required": ["organization_id", "project_id"],
+            "required": ["project_id"],
         },
     )
 
@@ -64,10 +62,9 @@ def delete_project_tool():
         inputSchema={
             "type": "object",
             "properties": {
-                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
             },
-            "required": ["organization_id", "project_id"],
+            "required": ["project_id"],
         },
     )
 
@@ -92,11 +89,10 @@ def update_project_tool():
         inputSchema={
             "type": "object",
             "properties": {
-                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
                 "name": {"type": "string", "description": "The new name of the project."},
             },
-            "required": ["organization_id", "project_id", "name"],
+            "required": ["project_id", "name"],
         },
     )
 
@@ -134,64 +130,74 @@ def update_organization_tool():
         },
     )
 
-def list_users_tool():
+def search_principals_tool():
     return Tool(
-        name="list_users",
-        description="Lists all HCP users.",
-        inputSchema={"type": "object", "properties": {}},
-    )
-
-def get_user_tool():
-    return Tool(
-        name="get_user",
-        description="Gets an HCP user by their ID.",
+        name="search_principals",
+        description="Searches for principals in an organization.",
         inputSchema={
             "type": "object",
             "properties": {
-                "user_id": {"type": "string", "description": "The ID of the user."},
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
+                "filter_str": {"type": "string", "description": "The filter string to use for the search."},
             },
-            "required": ["user_id"],
+            "required": ["organization_id"],
         },
     )
 
-def delete_user_tool():
+def get_principals_tool():
     return Tool(
-        name="delete_user",
-        description="Deletes an HCP user by their ID.",
+        name="get_principals",
+        description="Gets principals by their IDs.",
         inputSchema={
             "type": "object",
             "properties": {
-                "user_id": {"type": "string", "description": "The ID of the user."},
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
+                "principal_ids": {"type": "array", "items": {"type": "string"}, "description": "The IDs of the principals to get."},
             },
-            "required": ["user_id"],
+            "required": ["organization_id", "principal_ids"],
         },
     )
 
-def create_user_tool():
+def delete_service_principal_tool():
     return Tool(
-        name="create_user",
-        description="Creates a new HCP user.",
+        name="delete_service_principal",
+        description="Deletes a service principal by its ID.",
         inputSchema={
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "The name of the new user."},
-                "email": {"type": "string", "description": "The email of the new user."},
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
+                "principal_id": {"type": "string", "description": "The ID of the service principal."},
             },
-            "required": ["name", "email"],
+            "required": ["organization_id", "principal_id"],
         },
     )
 
-def update_user_tool():
+def create_service_principal_tool():
     return Tool(
-        name="update_user",
-        description="Updates an HCP user.",
+        name="create_service_principal",
+        description="Creates a new service principal.",
         inputSchema={
             "type": "object",
             "properties": {
-                "user_id": {"type": "string", "description": "The ID of the user."},
-                "name": {"type": "string", "description": "The new name of the user."},
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
+                "name": {"type": "string", "description": "The name of the new service principal."},
             },
-            "required": ["user_id", "name"],
+            "required": ["organization_id", "name"],
+        },
+    )
+
+def update_service_principal_tool():
+    return Tool(
+        name="update_service_principal",
+        description="Updates a service principal.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
+                "principal_id": {"type": "string", "description": "The ID of the service principal."},
+                "name": {"type": "string", "description": "The new name of the service principal."},
+            },
+            "required": ["organization_id", "principal_id", "name"],
         },
     )
 
@@ -202,10 +208,11 @@ def list_secrets_tool():
         inputSchema={
             "type": "object",
             "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
                 "app_name": {"type": "string", "description": "The name of the application."},
             },
-            "required": ["project_id", "app_name"],
+            "required": ["organization_id", "project_id", "app_name"],
         },
     )
 
@@ -216,11 +223,12 @@ def get_secret_tool():
         inputSchema={
             "type": "object",
             "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
                 "app_name": {"type": "string", "description": "The name of the application."},
                 "secret_name": {"type": "string", "description": "The name of the secret."},
             },
-            "required": ["project_id", "app_name", "secret_name"],
+            "required": ["organization_id", "project_id", "app_name", "secret_name"],
         },
     )
 
@@ -231,11 +239,12 @@ def delete_secret_tool():
         inputSchema={
             "type": "object",
             "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
                 "app_name": {"type": "string", "description": "The name of the application."},
                 "secret_name": {"type": "string", "description": "The name of the secret."},
             },
-            "required": ["project_id", "app_name", "secret_name"],
+            "required": ["organization_id", "project_id", "app_name", "secret_name"],
         },
     )
 
@@ -246,28 +255,13 @@ def create_secret_tool():
         inputSchema={
             "type": "object",
             "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "project_id": {"type": "string", "description": "The ID of the project."},
                 "app_name": {"type": "string", "description": "The name of the application."},
                 "secret_name": {"type": "string", "description": "The name of the new secret."},
                 "secret_value": {"type": "string", "description": "The value of the new secret."},
             },
-            "required": ["project_id", "app_name", "secret_name", "secret_value"],
-        },
-    )
-
-def update_secret_tool():
-    return Tool(
-        name="update_secret",
-        description="Updates a secret.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project_id": {"type": "string", "description": "The ID of the project."},
-                "app_name": {"type": "string", "description": "The name of the application."},
-                "secret_name": {"type": "string", "description": "The name of the secret."},
-                "secret_value": {"type": "string", "description": "The new value of the secret."},
-            },
-            "required": ["project_id", "app_name", "secret_name", "secret_value"],
+            "required": ["organization_id", "project_id", "app_name", "secret_name", "secret_value"],
         },
     )
 
@@ -292,9 +286,10 @@ def find_user_by_email_tool():
         inputSchema={
             "type": "object",
             "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the organization."},
                 "email": {"type": "string", "description": "The email of the user."},
             },
-            "required": ["email"],
+            "required": ["organization_id", "email"],
         },
     )
 

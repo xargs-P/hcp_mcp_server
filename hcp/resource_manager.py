@@ -13,33 +13,33 @@ async def list_projects(organization_id: str):
     token = await get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects", headers=headers)
+        response = await client.get(f"{RESOURCE_MANAGER_API_URL}/projects?scope.type=ORGANIZATION&scope.id={organization_id}", headers=headers)
         response.raise_for_status()
         projects = response.json()
         hcp_logger.info(projects)
         return projects
 
-async def get_project(organization_id: str, project_id: str):
+async def get_project(project_id: str, organization_id: str = None):
     """
     Gets a project by its ID.
     """
     token = await get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects/{project_id}", headers=headers)
+        response = await client.get(f"{RESOURCE_MANAGER_API_URL}/projects/{project_id}", headers=headers)
         response.raise_for_status()
         project = response.json()
         hcp_logger.info(project)
         return project
 
-async def delete_project(organization_id: str, project_id: str):
+async def delete_project(project_id: str, organization_id: str = None):
     """
     Deletes a project by its ID.
     """
     token = await get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
-        response = await client.delete(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects/{project_id}", headers=headers)
+        response = await client.delete(f"{RESOURCE_MANAGER_API_URL}/projects/{project_id}", headers=headers)
         response.raise_for_status()
         result = response.json()
         hcp_logger.info(result)
@@ -53,9 +53,9 @@ async def create_project(name: str, organization_id: str):
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects",
+            f"{RESOURCE_MANAGER_API_URL}/projects",
             headers=headers,
-            json={"name": name},
+            json={"name": name, "parent": {"type": "ORGANIZATION", "id": organization_id}},
         )
         response.raise_for_status()
         project = response.json()
@@ -88,7 +88,7 @@ async def list_organizations():
         hcp_logger.info(organizations)
     return {"organizations": organizations}
 
-async def update_project(organization_id: str, project_id: str, name: str):
+async def update_project(project_id: str, name: str, organization_id: str = None):
     """
     Updates a project's name.
     """
@@ -96,7 +96,7 @@ async def update_project(organization_id: str, project_id: str, name: str):
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
         response = await client.put(
-            f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects/{project_id}",
+            f"{RESOURCE_MANAGER_API_URL}/projects/{project_id}/name",
             headers=headers,
             json={"name": name},
         )
@@ -113,7 +113,7 @@ async def update_organization(organization_id: str, name: str):
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
         response = await client.put(
-            f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}",
+            f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/name",
             headers=headers,
             json={"name": name},
         )
