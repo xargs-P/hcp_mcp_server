@@ -1,8 +1,10 @@
 import httpx
+import logging
 from hcp.auth import get_access_token
 
 IAM_API_VERSION = "2023-06-27"
 IAM_API_URL = f"https://api.hashicorp.cloud/iam/{IAM_API_VERSION}"
+hcp_logger = logging.getLogger("hcp_api")
 
 async def list_users():
     """
@@ -13,7 +15,9 @@ async def list_users():
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{IAM_API_URL}/users", headers=headers)
         response.raise_for_status()
-        return response.json()
+        users = response.json()
+        hcp_logger.info(users)
+        return users
 
 async def get_user(user_id: str):
     """
@@ -24,7 +28,9 @@ async def get_user(user_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{IAM_API_URL}/users/{user_id}", headers=headers)
         response.raise_for_status()
-        return response.json()
+        user = response.json()
+        hcp_logger.info(user)
+        return user
 
 async def delete_user(user_id: str):
     """
@@ -35,7 +41,9 @@ async def delete_user(user_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.delete(f"{IAM_API_URL}/users/{user_id}", headers=headers)
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        hcp_logger.info(result)
+        return result
 
 async def create_user(name: str, email: str):
     """
@@ -50,7 +58,9 @@ async def create_user(name: str, email: str):
             json={"name": name, "email": email},
         )
         response.raise_for_status()
-        return response.json()
+        user = response.json()
+        hcp_logger.info(user)
+        return user
 
 async def update_user(user_id: str, name: str):
     """
@@ -65,4 +75,6 @@ async def update_user(user_id: str, name: str):
             json={"name": name},
         )
         response.raise_for_status()
-        return response.json()
+        user = response.json()
+        hcp_logger.info(user)
+        return user

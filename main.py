@@ -41,27 +41,27 @@ def get_tools():
     Returns a list of all available tools.
     """
     return [
-        tools.list_projects_tool().model_dump(exclude=["function"]),
-        tools.get_project_tool().model_dump(exclude=["function"]),
-        tools.delete_project_tool().model_dump(exclude=["function"]),
-        tools.create_project_tool().model_dump(exclude=["function"]),
-        tools.update_project_tool().model_dump(exclude=["function"]),
-        tools.get_organization_tool().model_dump(exclude=["function"]),
-        tools.list_organizations_tool().model_dump(exclude=["function"]),
-        tools.update_organization_tool().model_dump(exclude=["function"]),
-        tools.list_users_tool().model_dump(exclude=["function"]),
-        tools.get_user_tool().model_dump(exclude=["function"]),
-        tools.delete_user_tool().model_dump(exclude=["function"]),
-        tools.create_user_tool().model_dump(exclude=["function"]),
-        tools.update_user_tool().model_dump(exclude=["function"]),
-        tools.list_secrets_tool().model_dump(exclude=["function"]),
-        tools.get_secret_tool().model_dump(exclude=["function"]),
-        tools.delete_secret_tool().model_dump(exclude=["function"]),
-        tools.create_secret_tool().model_dump(exclude=["function"]),
-        tools.update_secret_tool().model_dump(exclude=["function"]),
-        tools.find_project_by_name_tool().model_dump(exclude=["function"]),
-        tools.find_user_by_email_tool().model_dump(exclude=["function"]),
-        tools.find_organization_by_name_tool().model_dump(exclude=["function"]),
+        tools.list_projects_tool().model_dump(),
+        tools.get_project_tool().model_dump(),
+        tools.delete_project_tool().model_dump(),
+        tools.create_project_tool().model_dump(),
+        tools.update_project_tool().model_dump(),
+        tools.get_organization_tool().model_dump(),
+        tools.list_organizations_tool().model_dump(),
+        tools.update_organization_tool().model_dump(),
+        tools.list_users_tool().model_dump(),
+        tools.get_user_tool().model_dump(),
+        tools.delete_user_tool().model_dump(),
+        tools.create_user_tool().model_dump(),
+        tools.update_user_tool().model_dump(),
+        tools.list_secrets_tool().model_dump(),
+        tools.get_secret_tool().model_dump(),
+        tools.delete_secret_tool().model_dump(),
+        tools.create_secret_tool().model_dump(),
+        tools.update_secret_tool().model_dump(),
+        tools.find_project_by_name_tool().model_dump(),
+        tools.find_user_by_email_tool().model_dump(),
+        tools.find_organization_by_name_tool().model_dump(),
     ]
 
 def get_prompts():
@@ -92,6 +92,7 @@ def get_prompts():
         "find_user_and_delete_user": prompts.FIND_USER_AND_DELETE_USER_PROMPT,
     }
 
+
 TOOL_MAP = {
     "list_projects": list_projects,
     "get_project": get_project,
@@ -117,19 +118,24 @@ TOOL_MAP = {
 }
 
 RESOURCE_MAP = {
-    "hcp/organization": get_organization,
-    "hcp/project": get_project,
-    "hcp/user": get_user,
+    "hcp://cloud.hashicorp.com/organizations/{organization_id}": get_organization,
+    "hcp://cloud.hashicorp.com/organizations/{organization_id}/projects/{project_id}": get_project,
+    "hcp://cloud.hashicorp.com/users/{user_id}": get_user,
 }
 
 async def process_mcp_request(body: dict):
     """
     Processes an MCP request and returns a response dictionary.
     """
-    logger.info(f"Received request: {json.dumps(body)}")
     request_id = body.get("id")
     method = body.get("method")
     params = body.get("params")
+
+    # Log client calls
+    if method in ["tools/call", "prompts/get", "resources/get"]:
+        logger.info(f"Client call: {json.dumps(body)}")
+    else:
+        logger.info(f"Received request: {json.dumps(body)}")
 
     if method == "initialize":
         return {
@@ -162,15 +168,22 @@ async def process_mcp_request(body: dict):
             "result": {"tools": get_tools()},
             "id": request_id,
         }
-    elif method == "tools/invoke":
+    elif method == "tools/call":
         tool_name = params.get("name")
-        parameters = params.get("parameters", {})
+        arguments = params.get("arguments", {})
         if tool_name in TOOL_MAP:
             try:
-                result = await TOOL_MAP[tool_name](**parameters)
+                result = await TOOL_MAP[tool_name](**arguments)
+                logger.info(f"Tool request data: {result}")
                 return {
                     "jsonrpc": "2.0",
-                    "result": result,
+                    "result": {"structuredContent": result },
+                    "id": request_id,
+                }
+            except ValueError as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32000, "message": "Server error", "data": str(e)},
                     "id": request_id,
                 }
             except TypeError as e:
@@ -180,9 +193,10 @@ async def process_mcp_request(body: dict):
                     "id": request_id,
                 }
             except Exception as e:
+                logger.error(f"An unexpected error occurred: {e}", exc_info=True)
                 return {
                     "jsonrpc": "2.0",
-                    "error": {"code": -32000, "message": "Server error", "data": str(e)},
+                    "error": {"code": -32000, "message": "Server error", "data": "An unexpected error occurred. See logs for details."},
                     "id": request_id,
                 }
         else:
@@ -191,27 +205,47 @@ async def process_mcp_request(body: dict):
                 "error": {"code": -32601, "message": f"Method not found: Tool '{tool_name}' not found."},
                 "id": request_id,
             }
-    elif method == "prompts/discover":
+    elif method == "prompts/get":
+        prompt_name = params.get("name")
+        if prompt_name in get_prompts():
+            return {
+                "jsonrpc": "2.0",
+                "result": get_prompts()[prompt_name].model_dump(),
+                "id": request_id,
+            }
+        else:
+            return {
+                "jsonrpc": "2.0",
+                "error": {"code": -32601, "message": f"Method not found: Prompt '{prompt_name}' not found."},
+                "id": request_id,
+            }
+    elif method == "prompts/list":
         return {
             "jsonrpc": "2.0",
-            "result": {"prompts": get_prompts()},
+            "result": {"prompts": [p.model_dump() for p in get_prompts().values()]},
             "id": request_id,
         }
-    elif method == "resources/discover":
+    elif method == "resources/list":
         return {
             "jsonrpc": "2.0",
-            "result": {"resources": resources.get_resources()},
+            "result": {"resources": [r.model_dump() for r in resources.get_resources()]},
             "id": request_id,
         }
     elif method == "resources/get":
-        resource_name = params.get("name")
+        resource_uri = params.get("uri")
         parameters = params.get("parameters", {})
-        if resource_name in RESOURCE_MAP:
+        if resource_uri in RESOURCE_MAP:
             try:
-                result = await RESOURCE_MAP[resource_name](**parameters)
+                result = await RESOURCE_MAP[resource_uri](**parameters)
                 return {
                     "jsonrpc": "2.0",
                     "result": result,
+                    "id": request_id,
+                }
+            except ValueError as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32000, "message": "Server error", "data": str(e)},
                     "id": request_id,
                 }
             except TypeError as e:
@@ -221,15 +255,16 @@ async def process_mcp_request(body: dict):
                     "id": request_id,
                 }
             except Exception as e:
+                logger.error(f"An unexpected error occurred: {e}", exc_info=True)
                 return {
                     "jsonrpc": "2.0",
-                    "error": {"code": -32000, "message": "Server error", "data": str(e)},
+                    "error": {"code": -32000, "message": "Server error", "data": "An unexpected error occurred. See logs for details."},
                     "id": request_id,
                 }
         else:
             return {
                 "jsonrpc": "2.0",
-                "error": {"code": -32601, "message": f"Method not found: Resource '{resource_name}' not found."},
+                "error": {"code": -32601, "message": f"Method not found: Resource '{resource_uri}' not found."},
                 "id": request_id,
             }
     else:
@@ -252,6 +287,8 @@ async def stdio_main():
             response_json = await process_mcp_request(request_json)
             if response_json:
                 try:
+                    logger.info(f"Request data: stdio_main: {response_json}")
+                    logger.info(f"Request data: stdio_main json: {json.dumps(response_json)}")
                     print(json.dumps(response_json), flush=True)
                 except TypeError:
                     response_json["result"] = str(response_json["result"])

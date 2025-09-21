@@ -5,26 +5,28 @@ class Tool(BaseModel):
     """
     A tool that can be exposed by the MCP server.
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     name: str
-    description: str
-    parameters: Dict[str, Any]
-    function: Callable
+    title: Optional[str] = None
+    description: Optional[str] = None
+    inputSchema: Optional[Dict[str, Any]] = None
+    outputSchema: Dict[str, Any] = Field(default={"type": "object"})
 
 class Prompt(BaseModel):
     """
     A prompt that can be exposed by the MCP server.
     """
     name: str
-    description: str
-    template: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    arguments: Optional[List[Dict[str, Any]]] = None
 
 class Resource(BaseModel):
     """
     A resource that can be exposed by the MCP server.
     """
+    uri: str
     name: str
-    description: str
-    type: str
-    resource_schema: Dict[str, Any]
+    title: Optional[str] = None
+    description: Optional[str] = None
+    mimeType: Optional[str] = None
+    size: Optional[int] = None

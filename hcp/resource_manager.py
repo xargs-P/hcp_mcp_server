@@ -1,8 +1,10 @@
 import httpx
+import logging
 from hcp.auth import get_access_token
 
-RESOURCE_MANAGER_API_VERSION = "2023-06-27"
+RESOURCE_MANAGER_API_VERSION = "2019-12-10"
 RESOURCE_MANAGER_API_URL = f"https://api.hashicorp.cloud/resource-manager/{RESOURCE_MANAGER_API_VERSION}"
+hcp_logger = logging.getLogger("hcp_api")
 
 async def list_projects(organization_id: str):
     """
@@ -13,7 +15,9 @@ async def list_projects(organization_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects", headers=headers)
         response.raise_for_status()
-        return response.json()
+        projects = response.json()
+        hcp_logger.info(projects)
+        return projects
 
 async def get_project(organization_id: str, project_id: str):
     """
@@ -24,7 +28,9 @@ async def get_project(organization_id: str, project_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects/{project_id}", headers=headers)
         response.raise_for_status()
-        return response.json()
+        project = response.json()
+        hcp_logger.info(project)
+        return project
 
 async def delete_project(organization_id: str, project_id: str):
     """
@@ -35,7 +41,9 @@ async def delete_project(organization_id: str, project_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.delete(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}/projects/{project_id}", headers=headers)
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        hcp_logger.info(result)
+        return result
 
 async def create_project(name: str, organization_id: str):
     """
@@ -50,7 +58,9 @@ async def create_project(name: str, organization_id: str):
             json={"name": name},
         )
         response.raise_for_status()
-        return response.json()
+        project = response.json()
+        hcp_logger.info(project)
+        return project
 
 async def get_organization(organization_id: str):
     """
@@ -61,7 +71,9 @@ async def get_organization(organization_id: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations/{organization_id}", headers=headers)
         response.raise_for_status()
-        return response.json()
+        organization = response.json()
+        hcp_logger.info(organization)
+        return organization
 
 async def list_organizations():
     """
@@ -72,7 +84,9 @@ async def list_organizations():
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{RESOURCE_MANAGER_API_URL}/organizations", headers=headers)
         response.raise_for_status()
-        return response.json()
+        organizations = response.json().get("organizations", [])
+        hcp_logger.info(organizations)
+    return {"organizations": organizations}
 
 async def update_project(organization_id: str, project_id: str, name: str):
     """
@@ -87,7 +101,9 @@ async def update_project(organization_id: str, project_id: str, name: str):
             json={"name": name},
         )
         response.raise_for_status()
-        return response.json()
+        project = response.json()
+        hcp_logger.info(project)
+        return project
 
 async def update_organization(organization_id: str, name: str):
     """
@@ -102,4 +118,6 @@ async def update_organization(organization_id: str, name: str):
             json={"name": name},
         )
         response.raise_for_status()
-        return response.json()
+        organization = response.json()
+        hcp_logger.info(organization)
+        return organization
