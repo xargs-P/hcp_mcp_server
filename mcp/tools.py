@@ -305,3 +305,16 @@ def find_organization_by_name_tool():
             "required": ["name"],
         },
     )
+
+def list_resources_tool():
+    return Tool(
+        name="list_resources",
+        description="Lists all resources in a project.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "The ID of the project."},
+            },
+            "required": ["project_id"],
+        },
+    )

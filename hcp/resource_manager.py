@@ -121,3 +121,19 @@ async def update_organization(organization_id: str, name: str):
         organization = response.json()
         hcp_logger.info(organization)
         return organization
+
+async def list_resources(project_id: str):
+    """
+    Lists all resources in a project.
+    """
+    token = await get_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{RESOURCE_MANAGER_API_URL}/resources?scope.type=PROJECT&scope.id={project_id}",
+            headers=headers,
+        )
+        response.raise_for_status()
+        resources = response.json()
+        hcp_logger.info(resources)
+        return resources

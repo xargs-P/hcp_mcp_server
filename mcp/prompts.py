@@ -236,22 +236,15 @@ FIND_PROJECT_AND_LIST_SECRETS_PROMPT = Prompt(
     ],
 )
 
-FIND_PROJECT_AND_DELETE_PROJECT_PROMPT = Prompt(
-    name="find_project_and_delete_project",
-    title="Find Project and Delete Project",
-    description="Finds a project by name and deletes it.",
+LIST_RESOURCES_PROMPT = Prompt(
+    name="list_resources",
+    title="List Resources",
+    description="Lists all resources in a project.",
     arguments=[
         {
-            "name": "project_name",
-            "description": "The name of the project.",
+            "name": "project_id",
+            "description": "The ID of the project.",
             "required": True,
-        },
-        {
-            "name": "organization_id",
-            "description": "The ID of the organization.",
-            "required": True,
-        },
+        }
     ],
 )
-
-

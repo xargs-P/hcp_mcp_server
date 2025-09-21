@@ -11,6 +11,7 @@ from hcp.resource_manager import (
     get_organization,
     list_organizations,
     update_organization,
+    list_resources,
 )
 from hcp.iam import (
     search_principals,
@@ -60,6 +61,7 @@ def get_tools():
         tools.find_project_by_name_tool().model_dump(),
         tools.find_user_by_email_tool().model_dump(),
         tools.find_organization_by_name_tool().model_dump(),
+        tools.list_resources_tool().model_dump(),
     ]
 
 def get_prompts():
@@ -80,7 +82,7 @@ def get_prompts():
         "delete_secret": prompts.DELETE_SECRET_PROMPT,
         "create_secret": prompts.CREATE_SECRET_PROMPT,
         "find_project_and_list_secrets": prompts.FIND_PROJECT_AND_LIST_SECRETS_PROMPT,
-        "find_project_and_delete_project": prompts.FIND_PROJECT_AND_DELETE_PROJECT_PROMPT,
+        "list_resources": prompts.LIST_RESOURCES_PROMPT,
     }
 
 
@@ -105,6 +107,7 @@ TOOL_MAP = {
     "find_project_by_name": find_project_by_name,
     "find_user_by_email": find_user_by_email,
     "find_organization_by_name": find_organization_by_name,
+    "list_resources": list_resources,
 }
 
 RESOURCE_MAP = {
