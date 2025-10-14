@@ -248,3 +248,54 @@ LIST_RESOURCES_PROMPT = Prompt(
         }
     ],
 )
+
+SEARCH_LOGS_PROMPT = Prompt(
+    name="search_logs",
+    title="Search Logs",
+    description=(
+        "Searches for audit logs in an organization using LogQL. "
+        "The LLM should determine the best topic to use based on the user's query, or default to 'hashicorp.platform.audit' if the user is not specific. "
+        "For advanced filtering, use the `query` parameter with LogQL syntax. "
+        "To filter on specific JSON fields in the log entries, use the `| json` parser in your query. "
+        'For example: `query=\'| json | control_plane_event_action="CREATE"\'`'
+    ),
+    arguments=[
+        {
+            "name": "organization_id",
+            "description": "The ID of the organization.",
+            "required": True,
+        },
+        {
+            "name": "query",
+            "description": (
+                "The LogQL query string for advanced filtering. "
+                "Can be combined with `project_id` and `topic`. "
+                "Example: '| json | resource_uuid=\"some-uuid\"'"
+            ),
+            "required": False,
+        },
+        {
+            "name": "project_id",
+            "description": "A project ID to filter by.",
+            "required": False,
+        },
+        {
+            "name": "topic",
+            "description": (
+                "A log topic to search. Example topics: 'hashicorp.platform.audit', 'hashicorp.packer.registry.audit', "
+                "'hashicorp.boundary.cluster.audit', 'hashicorp.consul.cluster.audit'"
+            ),
+            "required": False,
+        },
+        {
+            "name": "start_time",
+            "description": "The start time for the search. Accepts formats like '24 hours ago', 'yesterday at 5pm', or 'Oct 1, 2025'.",
+            "required": True,
+        },
+        {
+            "name": "end_time",
+            "description": "The end time for the search. Accepts formats like 'now', 'today', or 'Oct 3, 2025'.",
+            "required": True,
+        }
+    ],
+)

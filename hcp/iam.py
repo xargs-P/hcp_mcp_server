@@ -3,7 +3,7 @@ import logging
 from hcp.auth import get_access_token
 
 IAM_API_VERSION = "2019-12-10"
-IAM_API_URL = f"https://api.cloud.hashicorp.cloud/iam/{IAM_API_VERSION}"
+IAM_API_URL = f"https://api.hashicorp.cloud/iam/{IAM_API_VERSION}"
 hcp_logger = logging.getLogger("hcp_api")
 
 async def search_principals(organization_id: str, filter_str: str = None):

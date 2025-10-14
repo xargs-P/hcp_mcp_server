@@ -26,6 +26,9 @@ from hcp.vault import (
     delete_secret,
     create_secret,
 )
+from hcp.audit_logs import (
+    search_logs,
+)
 from utils.finders import (
     find_project_by_name,
     find_user_by_email,
@@ -62,6 +65,7 @@ def get_tools():
         tools.find_user_by_email_tool().model_dump(),
         tools.find_organization_by_name_tool().model_dump(),
         tools.list_resources_tool().model_dump(),
+        tools.search_logs_tool().model_dump(),
     ]
 
 def get_prompts():
@@ -83,6 +87,7 @@ def get_prompts():
         "create_secret": prompts.CREATE_SECRET_PROMPT,
         "find_project_and_list_secrets": prompts.FIND_PROJECT_AND_LIST_SECRETS_PROMPT,
         "list_resources": prompts.LIST_RESOURCES_PROMPT,
+        "search_logs": prompts.SEARCH_LOGS_PROMPT,
     }
 
 
@@ -108,6 +113,7 @@ TOOL_MAP = {
     "find_user_by_email": find_user_by_email,
     "find_organization_by_name": find_organization_by_name,
     "list_resources": list_resources,
+    "search_logs": search_logs,
 }
 
 RESOURCE_MAP = {
@@ -178,20 +184,20 @@ async def process_mcp_request(body: dict):
             except ValueError as e:
                 return {
                     "jsonrpc": "2.0",
-                    "error": {"code": -32000, "message": "Server error", "data": str(e)},
+                    "error": {"code": -32000, "message": f"ValueError: {str(e)} ", "data": str(e)},
                     "id": request_id,
                 }
             except TypeError as e:
                 return {
                     "jsonrpc": "2.0",
-                    "error": {"code": -32602, "message": "Invalid params", "data": str(e)},
+                    "error": {"code": -32602, "message": f"TypeError/Invalid params: {str(e)}", "data": str(e)},
                     "id": request_id,
                 }
             except Exception as e:
                 logger.error(f"An unexpected error occurred: {e}", exc_info=True)
                 return {
                     "jsonrpc": "2.0",
-                    "error": {"code": -32000, "message": "Server error", "data": "An unexpected error occurred. See logs for details."},
+                    "error": {"code": -32000, "message": f"Exception/Server error: {str(e)}", "data": "An unexpected error occurred. See logs for details."},
                     "id": request_id,
                 }
         else:

@@ -23,6 +23,9 @@ from hcp.vault import (
     delete_secret,
     create_secret,
 )
+from hcp.audit_logs import (
+    search_logs,
+)
 from utils.finders import (
     find_project_by_name,
     find_user_by_email,
@@ -316,5 +319,54 @@ def list_resources_tool():
                 "project_id": {"type": "string", "description": "The ID of the project."},
             },
             "required": ["project_id"],
+        },
+    )
+
+def search_logs_tool():
+    return Tool(
+        name="search_logs",
+        description=(
+            "Searches for audit logs in an organization using LogQL. "
+            "The LLM should determine the best topic to use based on the user's query, or default to 'hashicorp.platform.audit' if the user is not specific. "
+            "For advanced filtering, use the `query` parameter with LogQL syntax. "
+            "To filter on specific JSON fields in the log entries, use the `| json` parser in your query. "
+            'For example: `query=\'| json | control_plane_event_action="CREATE"\'`'
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "organization_id": {
+                    "type": "string",
+                    "description": "The ID of the organization.",
+                },
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "The LogQL query string for advanced filtering. "
+                        "Can be combined with `project_id` and `topic`. "
+                        "Example: '| json | resource_uuid=\"some-uuid\"'"
+                    ),
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": "A project ID to filter by.",
+                },
+                "topic": {
+                    "type": "string",
+                    "description": (
+                        "A log topic to search. Example topics: 'hashicorp.platform.audit', 'hashicorp.packer.registry.audit', "
+                        "'hashicorp.boundary.cluster.audit', 'hashicorp.consul.cluster.audit'"
+                    ),
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "The start time for the search. Accepts formats like '24 hours ago', 'yesterday at 5pm', or 'Oct 1, 2025'.",
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "The end time for the search. Accepts formats like 'now', 'today', or 'Oct 3, 2025'.",
+                },
+            },
+            "required": ["organization_id", "start_time", "end_time"],
         },
     )

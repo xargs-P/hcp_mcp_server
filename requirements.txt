@@ -1,15 +1,5 @@
-# Python Standard Library
-# (No specific packages from the standard library need to be listed here)
-
-# Third-Party Packages
-# HTTP client for making API requests
+fastapi
 httpx
-
-# Environment variable management
 python-dotenv
-
-# Data validation and settings management
-pydantic
-
-# Typing and annotations
-typing-extensions
+uvicorn
+dateparser
