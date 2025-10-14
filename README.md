@@ -40,13 +40,13 @@ The server is built to support the Model Context Protocol (MCP) and follows a mo
     ```
 
 2.  **Set up environment variables:**
-    Create a `.env` file in the root of the project and add the following:
+    Export the following variables in the shell for the HCP MCP server OR create a `.env` file in the root of the project and add the following:
     ```
     HCP_CLIENT_ID="your_hcp_client_id"
     HCP_CLIENT_SECRET="your_hcp_client_secret"
     ```
-
-3.  **Configure with Gemini CLI:**
+    
+4.  **Configure with Gemini CLI:**
     Update your `settings.json` for the Gemini CLI to include the following:
     ```json
     {
@@ -57,5 +57,5 @@ The server is built to support the Model Context Protocol (MCP) and follows a mo
     }
     ```
 
-4.  **Run the server:**
+5.  **Run the server:**
     The server is designed to be run as a stdio-based MCP transport. When the Gemini CLI starts, it will automatically run the server.
