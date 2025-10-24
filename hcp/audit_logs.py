@@ -77,27 +77,40 @@ async def search_logs(
         "query": final_query,
         "start": start_rfc3339,
         "end": end_rfc3339,
+        "page_size": 100,
     }
 
+    all_logs = []
     hcp_logger.info(f"search_logs payload for {organization_id}: {payload}")
     async with httpx.AsyncClient(
-          timeout=15,
+          timeout=60,
           event_hooks={
                       "request": [request_logger],
                       "response": [response_logger]
           }
         ) as client:
-        response = await client.post(
-            f"{LOGS_API_URL}/organizations/{organization_id}/entries/preview/search",
-            headers=headers,
-            json=payload,
-        )
-    try:
-        hcp_logger.info(f"search_logs response status code: {response.status_code}")
-    except Exception as e:
-        hcp_logger.error(f"error getting response status code: {str(e)}")
+        while True:
+            response = await client.post(
+                f"{LOGS_API_URL}/organizations/{organization_id}/entries/preview/search",
+                headers=headers,
+                json=payload,
+            )
+            try:
+                hcp_logger.info(f"search_logs response status code: {response.status_code}")
+            except Exception as e:
+                hcp_logger.error(f"error getting response status code: {str(e)}")
 
-    #hcp_logger.info(f"search_logs response content: {response.text}")
-    #response.raise_for_status()
-    logs = response.json()
-    return logs
+            response.raise_for_status()
+            data = response.json()
+            hcp_logger.info(f"search_logs response:   {data.get('streams', [])}")
+
+            all_logs.extend([data.get("streams", [])])
+
+            next_page_token = data.get("next_page_token")
+            if not next_page_token:
+                break
+            payload["next_page_token"] = next_page_token
+            hcp_logger.info(f"Check next page of response")
+
+
+    return {"streams": all_logs}
