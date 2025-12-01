@@ -83,7 +83,7 @@ async def search_logs(
     all_logs = []
     hcp_logger.info(f"search_logs payload for {organization_id}: {payload}")
     async with httpx.AsyncClient(
-          timeout=120,
+          timeout=180,
           event_hooks={
                       "request": [request_logger],
                       "response": [response_logger]

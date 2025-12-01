@@ -16,7 +16,7 @@ class Prompt(BaseModel):
     name: str
     title: Optional[str] = None
     description: Optional[str] = None
-    arguments: Optional[List[Dict[str, Any]]] = None
+    arguments: List[Dict[str, Any]] = Field(default_factory=list)
 
 class Resource(BaseModel):
     """
