@@ -370,3 +370,17 @@ def search_logs_tool():
             "required": ["organization_id", "start_time", "end_time"],
         },
     )
+
+def get_hcp_billing_summary_tool():
+    return Tool(
+        name="get_hcp_billing_summary",
+        description="Retrieves a summary of billing expenses for an HCP organization over a specified time range. The time range can be natural language (e.g., 'last month', 'last 3 months', 'current cycle').",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "organization_id": {"type": "string", "description": "The ID of the HCP organization."},
+                "time_range": {"type": "string", "description": "The desired time range for the billing summary (e.g., 'current cycle', 'last month', 'last 3 months', 'November 2025')."},
+            },
+            "required": ["organization_id", "time_range"],
+        },
+    )

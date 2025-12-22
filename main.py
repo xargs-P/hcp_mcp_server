@@ -29,6 +29,7 @@ from hcp.vault import (
 from hcp.audit_logs import (
     search_logs,
 )
+from hcp.billing import get_hcp_billing_summary  
 from utils.finders import (
     find_project_by_name,
     find_user_by_email,
@@ -66,6 +67,7 @@ def get_tools():
         tools.find_organization_by_name_tool().model_dump(),
         tools.list_resources_tool().model_dump(),
         tools.search_logs_tool().model_dump(),
+        tools.get_hcp_billing_summary_tool().model_dump(),  
     ]
 
 def get_prompts():
@@ -88,6 +90,7 @@ def get_prompts():
         "find_project_and_list_secrets": prompts.FIND_PROJECT_AND_LIST_SECRETS_PROMPT,
         "list_resources": prompts.LIST_RESOURCES_PROMPT,
         "search_logs": prompts.SEARCH_LOGS_PROMPT,
+        "get_hcp_billing_summary": prompts.GET_HCP_BILLING_SUMMARY_PROMPT,  
     }
 
 
@@ -114,6 +117,7 @@ TOOL_MAP = {
     "find_organization_by_name": find_organization_by_name,
     "list_resources": list_resources,
     "search_logs": search_logs,
+    "get_hcp_billing_summary": get_hcp_billing_summary,  
 }
 
 RESOURCE_MAP = {
@@ -288,8 +292,7 @@ async def stdio_main():
             response_json = await process_mcp_request(request_json)
             if response_json:
                 try:
-                    logger.info(f"Request data: stdio_main: {response_json}")
-                    logger.info(f"Request data: stdio_main json: {json.dumps(response_json)}")
+                    logger.info(f"Request data: stdio_main: {json.dumps(response_json)}")
                     print(json.dumps(response_json), flush=True)
                 except TypeError:
                     response_json["result"] = str(response_json["result"])

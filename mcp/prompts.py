@@ -299,3 +299,25 @@ SEARCH_LOGS_PROMPT = Prompt(
         }
     ],
 )
+
+GET_HCP_BILLING_SUMMARY_PROMPT = Prompt(
+    name="get_hcp_billing_summary",
+    title="Get HCP Billing Summary",
+    description=(
+        "Retrieves a summary of billing expenses for an HCP organization over a specified time range. "
+        "The time range can be natural language (e.g., 'last month', 'last 3 months', 'current cycle')."
+    ),
+    arguments=[
+        {
+            "name": "organization_id",
+            "description": "The ID of the HCP organization.",
+            "required": True,
+        },
+        {
+            "name": "time_range",
+            "description": "The desired time range for the billing summary (e.g., 'current cycle', 'last month', 'last 3 months', 'November 2025').",
+            "required": True,
+        },
+
+    ],
+)
