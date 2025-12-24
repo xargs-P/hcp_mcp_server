@@ -304,8 +304,17 @@ GET_HCP_BILLING_SUMMARY_PROMPT = Prompt(
     name="get_hcp_billing_summary",
     title="Get HCP Billing Summary",
     description=(
-        "Retrieves a summary of billing expenses for an HCP organization over a specified time range. "
-        "The time range can be natural language (e.g., 'last month', 'last 3 months', 'current cycle')."
+        "Retrieves a summary of billing expenses for an HCP organization over a specified date range. "
+        "LLM Instructions: Your primary responsibility is to convert the user's natural language request into a precise date range. "
+        "Before calling the tool, you MUST follow these steps:\n"
+        "1. Determine the current date to understand relative requests (e.g., 'this month', 'last year').\n"
+        "2. Calculate the exact start_date (as the first day of the period) and end_date (as the last day of the period) in YYYY-MM-DD format.\n"
+        "3. Assume the current year for month-based queries unless a specific year is mentioned.\n"
+        "4. **If the user requests non-consecutive time periods (e.g., 'January and November'), make a separate tool call for each distinct period and then synthesize the results into a single summary.**\n\n"
+        "Examples of Date Range Calculation (assuming current date is 2025-12-23):\n"
+        "- User: 'summarize my current billing statement' -> call 1: {start_date: '2025-12-01', end_date: '2025-12-31'}\n"
+        "- User: 'summarize last 3 months billing statements' -> call 1: {start_date: '2025-09-01', end_date: '2025-11-30'}\n"
+        "- User: 'summarize January and November billing statements' -> call 1: {start_date: '2025-01-01', end_date: '2025-01-31'}, call 2: {start_date: '2025-11-01', end_date: '2025-11-30'}"
     ),
     arguments=[
         {
@@ -314,10 +323,14 @@ GET_HCP_BILLING_SUMMARY_PROMPT = Prompt(
             "required": True,
         },
         {
-            "name": "time_range",
-            "description": "The desired time range for the billing summary (e.g., 'current cycle', 'last month', 'last 3 months', 'November 2025').",
+            "name": "start_date",
+            "description": "The start date of the billing period in YYYY-MM-DD format.",
             "required": True,
         },
-
+        {
+            "name": "end_date",
+            "description": "The end date of the billing period in YYYY-MM-DD format.",
+            "required": True,
+        },
     ],
 )
